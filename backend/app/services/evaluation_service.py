@@ -43,6 +43,13 @@ class EvaluationService:
         total_latency_ms = 0.0
         total_output_tokens = 0
         judge_consistencies: list[float] = []
+        diff_state: dict[str, float] = {
+            "pressure": 0.0,
+            "exploration_entropy": 0.0,
+            "target_difficulty": request.config.initial_difficulty,
+            "raw_delta": 0.0,
+            "clipped_delta": 0.0,
+        }
 
         for target in request.agents:
             agent = self.agent_factory.build(target)
@@ -59,7 +66,8 @@ class EvaluationService:
                     attack_prompt, tags = self.adversary.generate_attack_prompt(scenario, difficulty=difficulty)
                     conversation[-1] = {"role": "user", "content": attack_prompt}
                     start = time.perf_counter()
-                    output = await agent.respond(scenario.system_context, conversation)
+                    agent_response = await agent.respond(scenario.system_context, conversation)
+                    output = agent_response.output_text
                     latency_ms = (time.perf_counter() - start) * 1000
                     token_estimate = max(1, int(len(output.split()) * 1.3))
                     score_part = env.evaluate_response(scenario, output)
@@ -70,6 +78,8 @@ class EvaluationService:
                             user_input=attack_prompt,
                             agent_output=output,
                             adversarial_tags=tags,
+                            tool_calls=agent_response.tool_calls,
+                            planning_trace=agent_response.planning_trace,
                             latency_ms=round(latency_ms, 2),
                             output_tokens_estimate=token_estimate,
                         )
@@ -122,6 +132,7 @@ class EvaluationService:
                 failure_rate = 1.0 if red_team_success else 0.0
                 used_tags = [tag for turn_tags in attacks for tag in turn_tags]
                 self.adversary.observe_attack_outcome(used_tags, red_team_success)
+                diff_state = self.adversary.difficulty_state(difficulty, failure_rate)
                 difficulty = self.adversary.evolve_distribution(difficulty, failure_rate)
 
         overall_score = sum(r.score.weighted_total for r in all_runs) / max(1, len(all_runs))
@@ -154,6 +165,12 @@ class EvaluationService:
                 "judge_reliability": {
                     "mean_judge_consistency": round(sum(judge_consistencies) / max(1, len(judge_consistencies)), 4),
                     "samples": len(judge_consistencies),
+                },
+                "difficulty_algorithm": {
+                    "formula": "delta = 0.6*(target-d) + 0.3*(failure_rate-0.4) + 0.1*(0.5-entropy)",
+                    "target": "0.55 + 0.35*pressure",
+                    "clip": "[-0.12, 0.12]",
+                    "last_state": diff_state,
                 },
             },
         )

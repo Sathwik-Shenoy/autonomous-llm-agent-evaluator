@@ -50,6 +50,8 @@ class TurnRecord(BaseModel):
     user_input: str
     agent_output: str
     adversarial_tags: list[str] = Field(default_factory=list)
+    tool_calls: list[str] = Field(default_factory=list)
+    planning_trace: list[str] = Field(default_factory=list)
     latency_ms: float = 0.0
     output_tokens_estimate: int = 0
 
@@ -99,3 +101,22 @@ class BenchmarkSummary(BaseModel):
     model_ci95: dict[str, float] = Field(default_factory=dict)
     attack_success_rate: dict[str, float]
     total_runs: int
+
+
+class BenchmarkValidationRequest(BaseModel):
+    benchmark_name: str
+    agent: AgentTarget
+    sample_size: int = Field(default=25, ge=1, le=500)
+    seed: int = 42
+
+
+class BenchmarkValidationResult(BaseModel):
+    benchmark_name: str
+    sample_size: int
+    task_accuracy: float
+    evaluator_mean_score: float
+    human_mean_score: float
+    evaluator_human_pearson: float
+    evaluator_human_spearman: float
+    evaluator_human_ci95: float
+    notes: list[str] = Field(default_factory=list)

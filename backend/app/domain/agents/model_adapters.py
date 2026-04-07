@@ -4,7 +4,7 @@ import httpx
 from openai import AsyncOpenAI
 
 from app.core.config import settings
-from app.domain.agents.base import BaseAgent
+from app.domain.agents.base import AgentResponse, BaseAgent
 
 
 class OpenAIChatAgent(BaseAgent):
@@ -13,12 +13,12 @@ class OpenAIChatAgent(BaseAgent):
         self.model_name = model_name
         self._client = AsyncOpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
 
-    async def respond(self, system_context: str, conversation: list[dict[str, str]]) -> str:
+    async def respond(self, system_context: str, conversation: list[dict[str, str]]) -> AgentResponse:
         if self._client is None:
-            return "OpenAI key missing; unable to produce model output."
+            return AgentResponse(output_text="OpenAI key missing; unable to produce model output.")
         messages = [{"role": "system", "content": system_context}] + conversation
         completion = await self._client.chat.completions.create(model=self.model_name, messages=messages)
-        return completion.choices[0].message.content or ""
+        return AgentResponse(output_text=completion.choices[0].message.content or "")
 
 
 class HuggingFaceInferenceAgent(BaseAgent):
@@ -27,9 +27,9 @@ class HuggingFaceInferenceAgent(BaseAgent):
         self.model_name = model_name
         self._token = settings.hf_api_token
 
-    async def respond(self, system_context: str, conversation: list[dict[str, str]]) -> str:
+    async def respond(self, system_context: str, conversation: list[dict[str, str]]) -> AgentResponse:
         if not self._token:
-            return "HF token missing; unable to produce model output."
+            return AgentResponse(output_text="HF token missing; unable to produce model output.")
 
         prompt_parts = [f"System: {system_context}"]
         for turn in conversation:
@@ -53,7 +53,7 @@ class HuggingFaceInferenceAgent(BaseAgent):
         async with httpx.AsyncClient(timeout=25.0) as client:
             response = await client.post(url, json=payload, headers=headers)
             if response.status_code >= 400:
-                return f"HF inference error ({response.status_code}): {response.text[:200]}"
+                return AgentResponse(output_text=f"HF inference error ({response.status_code}): {response.text[:200]}")
             data = response.json()
 
         if isinstance(data, list) and data:
@@ -61,7 +61,7 @@ class HuggingFaceInferenceAgent(BaseAgent):
             if isinstance(first, dict):
                 text = first.get("generated_text", "")
                 if isinstance(text, str):
-                    return text.strip()
+                    return AgentResponse(output_text=text.strip())
         if isinstance(data, dict) and isinstance(data.get("generated_text"), str):
-            return data["generated_text"].strip()
-        return "HF inference produced no usable text."
+            return AgentResponse(output_text=data["generated_text"].strip())
+        return AgentResponse(output_text="HF inference produced no usable text.")

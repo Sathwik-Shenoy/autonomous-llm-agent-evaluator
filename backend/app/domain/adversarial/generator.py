@@ -83,10 +83,21 @@ class AdversarialUserGenerator:
     def strategy_mix(self) -> dict[str, float]:
         return self._bandit.strategy_mix()
 
-    def evolve_distribution(self, current_difficulty: float, failure_rate: float) -> float:
+    def difficulty_state(self, current_difficulty: float, failure_rate: float) -> dict[str, float]:
         pressure = self._bandit.pressure()
         exploration = self._bandit.entropy()
         target = 0.55 + 0.35 * pressure
         delta = 0.6 * (target - current_difficulty) + 0.3 * (failure_rate - 0.4) + 0.1 * (0.5 - exploration)
-        next_difficulty = current_difficulty + max(-0.12, min(0.12, delta))
+        clipped_delta = max(-0.12, min(0.12, delta))
+        return {
+            "pressure": round(pressure, 4),
+            "exploration_entropy": round(exploration, 4),
+            "target_difficulty": round(target, 4),
+            "raw_delta": round(delta, 4),
+            "clipped_delta": round(clipped_delta, 4),
+        }
+
+    def evolve_distribution(self, current_difficulty: float, failure_rate: float) -> float:
+        state = self.difficulty_state(current_difficulty, failure_rate)
+        next_difficulty = current_difficulty + state["clipped_delta"]
         return max(0.1, min(1.0, next_difficulty))
