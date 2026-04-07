@@ -34,6 +34,7 @@ class EvaluationService:
 
         all_runs: list[AgentRunResult] = []
         difficulty = request.config.initial_difficulty
+        attack_tags_seen: list[str] = []
 
         for target in request.agents:
             agent = self.agent_factory.build(target)
@@ -63,6 +64,7 @@ class EvaluationService:
                     per_turn_correctness.append(score_part.get("correctness", 0.0))
                     outputs.append(output)
                     attacks.append(tags)
+                    attack_tags_seen.extend(tags)
 
                     if turn_idx + 1 < request.config.max_turns:
                         conversation.append(
@@ -96,6 +98,8 @@ class EvaluationService:
                 )
 
                 failure_rate = 1.0 if red_team_success else 0.0
+                used_tags = [tag for turn_tags in attacks for tag in turn_tags]
+                self.adversary.observe_attack_outcome(used_tags, red_team_success)
                 difficulty = self.adversary.evolve_distribution(difficulty, failure_rate)
 
         overall_score = sum(r.score.weighted_total for r in all_runs) / max(1, len(all_runs))
@@ -116,6 +120,8 @@ class EvaluationService:
                 "failure_summary": failure_summary,
                 "replay_candidates": replay_ids,
                 "benchmark": benchmark.model_dump(mode="json"),
+                "adversarial_strategy_mix": self.adversary.strategy_mix(),
+                "adversarial_tags_seen": sorted(set(attack_tags_seen)),
             },
         )
 
