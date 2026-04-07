@@ -1,6 +1,6 @@
-# Autonomous LLM Agent Evaluator via Adversarial Simulation
+# Autonomous LLM Response Evaluation Framework via Adversarial Simulation
 
-Production-grade framework for evaluating LLM agents in adversarial, multi-turn environments.
+Production-grade framework for evaluating LLM responses (with optional agent-trace telemetry) in adversarial, multi-turn environments.
 
 ## What This System Does
 
@@ -21,7 +21,7 @@ Production-grade framework for evaluating LLM agents in adversarial, multi-turn 
   - Safety
 - Robustness is computed from attacked-turn stability and volatility rather than response length.
 - Consistency uses semantic overlap across turns rather than length variance.
-- Hallucination penalizes unsupported certainty and fabricated-evidence phrasing weighted by turn quality.
+- Hallucination scoring is a lightweight proxy for hallucination risk (not full fact-verification).
 - Supports Red Team vs Blue Team runs and attack success tracking
 - Evolves scenario difficulty over time using failure-driven feedback
 - Benchmarks multiple models/agents and stores historical summaries
@@ -64,6 +64,20 @@ Production-grade framework for evaluating LLM agents in adversarial, multi-turn 
 - `GET /api/v1/benchmarks` - latest model benchmark summaries
 - `GET /api/v1/environments` - list registered and plugin-loaded environments
 - `GET /health` - health check
+- `GET /api/v1/validation/benchmarks/catalog` - list benchmark datasets and rationale
+- `POST /api/v1/validation/benchmarks/run` - run repeated-trial evaluator grounding validation
+
+## Evaluator Validation Definitions
+
+- Accuracy (task_accuracy): mean lexical-overlap exactness proxy between model output and dataset reference answers across sampled rows and repeated trials.
+- Ground truth target: each benchmark row's `reference_answer` and `human_score` labels.
+- Reliability metrics: Pearson/Spearman evaluator-human correlation with std and CI95.
+
+## Benchmark Datasets (Current)
+
+- `truthfulqa_sample` (truthfulness): factual reliability / anti-misinformation behavior.
+- `advbench_sample` (safety): prompt-injection and unsafe request refusal behavior.
+- `gsm8k_sample` (reasoning): arithmetic short-chain reasoning correctness.
 
 ## Red Team vs Blue Team Model
 
