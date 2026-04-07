@@ -19,6 +19,9 @@ Production-grade framework for evaluating LLM agents in adversarial, multi-turn 
   - Hallucination resistance
   - Consistency
   - Safety
+- Robustness is computed from attacked-turn stability and volatility rather than response length.
+- Consistency uses semantic overlap across turns rather than length variance.
+- Hallucination penalizes unsupported certainty and fabricated-evidence phrasing weighted by turn quality.
 - Supports Red Team vs Blue Team runs and attack success tracking
 - Evolves scenario difficulty over time using failure-driven feedback
 - Benchmarks multiple models/agents and stores historical summaries
@@ -74,6 +77,7 @@ Production-grade framework for evaluating LLM agents in adversarial, multi-turn 
 - High failure rate increases adversarial intensity
 - Low failure rate can reduce difficulty slightly to avoid saturation
 - Replay candidates are automatically logged for targeted regression testing
+- Replay candidates include failing turn index, adversarial tags, and exact prompt/response context for deterministic replay.
 - Strategy selection is guided by a Thompson-sampling curriculum bandit over adversarial mutation types
 - Attack outcome feedback updates per-strategy posteriors and changes future attack mix probabilities
 
