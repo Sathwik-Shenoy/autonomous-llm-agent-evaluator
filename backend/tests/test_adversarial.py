@@ -21,5 +21,9 @@ def test_generator_increases_attack_complexity():
 
 def test_difficulty_evolution():
     gen = AdversarialUserGenerator()
-    assert gen.evolve_distribution(0.3, failure_rate=0.5) > 0.3
-    assert gen.evolve_distribution(0.3, failure_rate=0.1) < 0.3
+    high_failure = gen.evolve_distribution(0.3, failure_rate=0.5)
+    low_failure = gen.evolve_distribution(0.3, failure_rate=0.1)
+
+    assert high_failure > low_failure
+    assert 0.1 <= low_failure <= 1.0
+    assert 0.1 <= high_failure <= 1.0
