@@ -23,6 +23,7 @@ Production-grade framework for evaluating LLM agents in adversarial, multi-turn 
 - Evolves scenario difficulty over time using failure-driven feedback
 - Benchmarks multiple models/agents and stores historical summaries
 - Provides a frontend dashboard for operational visibility
+- Supports live model benchmarking through OpenAI and Hugging Face inference adapters
 
 ## Architecture
 
@@ -73,6 +74,8 @@ Production-grade framework for evaluating LLM agents in adversarial, multi-turn 
 - High failure rate increases adversarial intensity
 - Low failure rate can reduce difficulty slightly to avoid saturation
 - Replay candidates are automatically logged for targeted regression testing
+- Strategy selection is guided by a Thompson-sampling curriculum bandit over adversarial mutation types
+- Attack outcome feedback updates per-strategy posteriors and changes future attack mix probabilities
 
 ## Plugin Environments
 
@@ -153,6 +156,57 @@ npm run dev
   }
 }
 ```
+
+### OpenAI Agent Payload Example
+
+```json
+{
+  "environment": "code_review",
+  "agents": [
+    { "name": "gpt4o-redteam-eval", "model_provider": "openai", "model_name": "gpt-4o-mini" }
+  ],
+  "config": {
+    "runs_per_agent": 2,
+    "initial_difficulty": 0.55,
+    "max_turns": 4,
+    "use_llm_judge": true
+  }
+}
+```
+
+### Hugging Face Agent Payload Example
+
+```json
+{
+  "environment": "customer_support",
+  "agents": [
+    { "name": "hf-mistral-eval", "model_provider": "huggingface", "model_name": "mistralai/Mistral-7B-Instruct-v0.3" }
+  ],
+  "config": {
+    "runs_per_agent": 2,
+    "initial_difficulty": 0.5,
+    "max_turns": 4,
+    "use_llm_judge": false
+  }
+}
+```
+
+## Running Tests
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pytest -q
+```
+
+Current tests cover:
+
+- Adversarial generator behavior
+- Curriculum-bandit posterior updates
+- Scoring normalization
+- Model adapter fallback behavior
 
 ## Design Decisions
 

@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EnvironmentType(str, Enum):
@@ -11,6 +11,8 @@ class EnvironmentType(str, Enum):
 
 
 class AgentTarget(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     name: str
     model_provider: str = "local"
     model_name: str = "rule-based"
@@ -82,6 +84,8 @@ class EvaluationRunResponse(BaseModel):
 
 
 class BenchmarkSummary(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     environment: EnvironmentType
     model_scores: dict[str, float]
     attack_success_rate: dict[str, float]
