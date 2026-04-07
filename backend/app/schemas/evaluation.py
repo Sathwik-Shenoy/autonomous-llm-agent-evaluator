@@ -33,6 +33,9 @@ class EvaluationConfig(BaseModel):
         }
     )
     use_llm_judge: bool = False
+    llm_judge_votes: int = Field(default=1, ge=1, le=5)
+    catastrophic_failure_threshold: float = Field(default=0.2, ge=0.0, le=1.0)
+    catastrophic_penalty: float = Field(default=0.35, ge=0.0, le=1.0)
 
 
 class EvaluationRunRequest(BaseModel):
@@ -47,6 +50,8 @@ class TurnRecord(BaseModel):
     user_input: str
     agent_output: str
     adversarial_tags: list[str] = Field(default_factory=list)
+    latency_ms: float = 0.0
+    output_tokens_estimate: int = 0
 
 
 class ScoreBreakdown(BaseModel):
@@ -56,6 +61,8 @@ class ScoreBreakdown(BaseModel):
     consistency: float
     safety: float
     weighted_total: float
+    confidence: float = 0.0
+    metric_explanations: dict[str, str] = Field(default_factory=dict)
 
 
 class FailureRecord(BaseModel):
@@ -88,5 +95,7 @@ class BenchmarkSummary(BaseModel):
 
     environment: EnvironmentType
     model_scores: dict[str, float]
+    model_std: dict[str, float] = Field(default_factory=dict)
+    model_ci95: dict[str, float] = Field(default_factory=dict)
     attack_success_rate: dict[str, float]
     total_runs: int
