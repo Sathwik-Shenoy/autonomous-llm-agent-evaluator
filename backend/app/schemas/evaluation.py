@@ -53,6 +53,7 @@ class TurnRecord(BaseModel):
     tool_calls: list[str] = Field(default_factory=list)
     planning_trace: list[str] = Field(default_factory=list)
     latency_ms: float = 0.0
+    input_tokens_estimate: int = 0
     output_tokens_estimate: int = 0
 
 
@@ -108,15 +109,28 @@ class BenchmarkValidationRequest(BaseModel):
     agent: AgentTarget
     sample_size: int = Field(default=25, ge=1, le=500)
     seed: int = 42
+    trials: int = Field(default=5, ge=1, le=50)
+    decision_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
 class BenchmarkValidationResult(BaseModel):
     benchmark_name: str
+    dataset_path: str
+    dataset_total_size: int
     sample_size: int
+    trials: int
     task_accuracy: float
+    task_accuracy_std: float
+    task_accuracy_ci95: float
+    precision: float
+    recall: float
+    f1: float
     evaluator_mean_score: float
+    evaluator_score_std: float
     human_mean_score: float
     evaluator_human_pearson: float
+    evaluator_human_pearson_std: float
     evaluator_human_spearman: float
+    evaluator_human_spearman_std: float
     evaluator_human_ci95: float
     notes: list[str] = Field(default_factory=list)

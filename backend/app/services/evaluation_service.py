@@ -41,8 +41,11 @@ class EvaluationService:
         difficulty = request.config.initial_difficulty
         attack_tags_seen: list[str] = []
         total_latency_ms = 0.0
+        total_input_tokens = 0
         total_output_tokens = 0
         judge_consistencies: list[float] = []
+        total_tool_calls = 0
+        total_planning_steps = 0
         diff_state: dict[str, float] = {
             "pressure": 0.0,
             "exploration_entropy": 0.0,
@@ -69,6 +72,7 @@ class EvaluationService:
                     agent_response = await agent.respond(scenario.system_context, conversation)
                     output = agent_response.output_text
                     latency_ms = (time.perf_counter() - start) * 1000
+                    input_token_estimate = max(1, int(len(attack_prompt.split()) * 1.3))
                     token_estimate = max(1, int(len(output.split()) * 1.3))
                     score_part = env.evaluate_response(scenario, output)
 
@@ -81,6 +85,7 @@ class EvaluationService:
                             tool_calls=agent_response.tool_calls,
                             planning_trace=agent_response.planning_trace,
                             latency_ms=round(latency_ms, 2),
+                            input_tokens_estimate=input_token_estimate,
                             output_tokens_estimate=token_estimate,
                         )
                     )
@@ -89,7 +94,10 @@ class EvaluationService:
                     attacks.append(tags)
                     attack_tags_seen.extend(tags)
                     total_latency_ms += latency_ms
+                    total_input_tokens += input_token_estimate
                     total_output_tokens += token_estimate
+                    total_tool_calls += len(agent_response.tool_calls)
+                    total_planning_steps += len(agent_response.planning_trace)
 
                     if turn_idx + 1 < request.config.max_turns:
                         conversation.append(
@@ -137,8 +145,12 @@ class EvaluationService:
 
         overall_score = sum(r.score.weighted_total for r in all_runs) / max(1, len(all_runs))
         attack_success_rate = sum(1.0 if r.red_team_success else 0.0 for r in all_runs) / max(1, len(all_runs))
-        avg_latency_ms = total_latency_ms / max(1, len(all_runs) * request.config.max_turns)
-        eval_cost_estimate = round((total_output_tokens / 1000.0) * 0.002, 6)
+        total_turns = max(1, len(all_runs) * request.config.max_turns)
+        avg_latency_ms = total_latency_ms / total_turns
+        throughput_turns_per_sec = total_turns / max(0.001, (total_latency_ms / 1000.0))
+        input_cost_estimate = (total_input_tokens / 1000.0) * 0.0015
+        output_cost_estimate = (total_output_tokens / 1000.0) * 0.002
+        eval_cost_estimate = round(input_cost_estimate + output_cost_estimate, 6)
 
         eval_id = str(uuid.uuid4())
         failure_summary = self.failure_analyzer.summarize(all_runs)
@@ -159,8 +171,16 @@ class EvaluationService:
                 "adversarial_tags_seen": sorted(set(attack_tags_seen)),
                 "operation_metrics": {
                     "avg_turn_latency_ms": round(avg_latency_ms, 2),
+                    "throughput_turns_per_sec": round(throughput_turns_per_sec, 4),
+                    "total_input_tokens_estimate": total_input_tokens,
                     "total_output_tokens_estimate": total_output_tokens,
+                    "input_cost_estimate_usd": round(input_cost_estimate, 6),
+                    "output_cost_estimate_usd": round(output_cost_estimate, 6),
                     "eval_cost_estimate_usd": eval_cost_estimate,
+                },
+                "agent_behavior": {
+                    "avg_tool_calls_per_turn": round(total_tool_calls / total_turns, 4),
+                    "avg_planning_steps_per_turn": round(total_planning_steps / total_turns, 4),
                 },
                 "judge_reliability": {
                     "mean_judge_consistency": round(sum(judge_consistencies) / max(1, len(judge_consistencies)), 4),
