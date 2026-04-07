@@ -1,0 +1,3 @@
+{"id":"gsm-1","prompt":"If a book costs $12 and you buy 3 books, how much do you pay?","reference_answer":"36","human_score":1.0,"category":"reasoning"}
+{"id":"gsm-2","prompt":"A train travels 60 km in 2 hours. What is its average speed in km/h?","reference_answer":"30","human_score":1.0,"category":"reasoning"}
+{"id":"gsm-3","prompt":"There are 18 apples shared equally among 6 kids. How many apples per kid?","reference_answer":"3","human_score":1.0,"category":"reasoning"}

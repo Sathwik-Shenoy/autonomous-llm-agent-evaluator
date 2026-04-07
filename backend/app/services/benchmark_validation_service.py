@@ -6,7 +6,7 @@ import random
 from pathlib import Path
 
 from app.domain.evaluation.scoring import EvaluationEngine
-from app.schemas.evaluation import BenchmarkValidationRequest, BenchmarkValidationResult
+from app.schemas.evaluation import BenchmarkDatasetInfo, BenchmarkValidationRequest, BenchmarkValidationResult
 from app.services.agent_factory import AgentFactory
 
 
@@ -93,6 +93,9 @@ class BenchmarkValidationService:
             dataset_total_size=len(data),
             sample_size=min(request.sample_size, len(data)),
             trials=request.trials,
+            accuracy_definition="Mean exactness proxy: lexical overlap(reference, output) averaged across sampled rows and trials.",
+            accuracy_target="Dataset reference_answer with human_score labels used for correlation.",
+            scoring_criteria="Correctness from reference overlap; evaluator reliability from Pearson/Spearman + CI95 over repeated trials.",
             task_accuracy=round(mean_task_accuracy, 4),
             task_accuracy_std=round(self._std(trial_task_accuracy), 4),
             task_accuracy_ci95=round(self._ci95(trial_task_accuracy), 4),
@@ -109,6 +112,46 @@ class BenchmarkValidationService:
             evaluator_human_ci95=round(self._ci95(trial_eval_mean), 4),
             notes=notes,
         )
+
+    def dataset_catalog(self) -> list[BenchmarkDatasetInfo]:
+        catalog = [
+            {
+                "name": "truthfulqa_sample",
+                "primary_metric": "truthfulness agreement",
+                "rationale": "Targets factual reliability / anti-misinformation behavior.",
+                "domain": "truthfulness",
+            },
+            {
+                "name": "advbench_sample",
+                "primary_metric": "attack refusal precision",
+                "rationale": "Targets safety and prompt-injection resistance.",
+                "domain": "safety",
+            },
+            {
+                "name": "gsm8k_sample",
+                "primary_metric": "math reasoning correctness",
+                "rationale": "Targets arithmetic and short-chain reasoning robustness.",
+                "domain": "reasoning",
+            },
+        ]
+
+        out: list[BenchmarkDatasetInfo] = []
+        for row in catalog:
+            path = Path(__file__).resolve().parents[2] / "benchmarks" / f"{row['name']}.jsonl"
+            total_rows = 0
+            if path.exists():
+                total_rows = sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
+            out.append(
+                BenchmarkDatasetInfo(
+                    name=row["name"],
+                    path=f"benchmarks/{row['name']}.jsonl",
+                    total_rows=total_rows,
+                    primary_metric=row["primary_metric"],
+                    rationale=row["rationale"],
+                    domain=row["domain"],
+                )
+            )
+        return out
 
     def _load_dataset(self, benchmark_name: str) -> list[dict]:
         file_path = Path(__file__).resolve().parents[2] / "benchmarks" / f"{benchmark_name}.jsonl"

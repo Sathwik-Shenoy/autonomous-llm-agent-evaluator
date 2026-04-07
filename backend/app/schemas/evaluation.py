@@ -119,6 +119,9 @@ class BenchmarkValidationResult(BaseModel):
     dataset_total_size: int
     sample_size: int
     trials: int
+    accuracy_definition: str
+    accuracy_target: str
+    scoring_criteria: str
     task_accuracy: float
     task_accuracy_std: float
     task_accuracy_ci95: float
@@ -134,3 +137,12 @@ class BenchmarkValidationResult(BaseModel):
     evaluator_human_spearman_std: float
     evaluator_human_ci95: float
     notes: list[str] = Field(default_factory=list)
+
+
+class BenchmarkDatasetInfo(BaseModel):
+    name: str
+    path: str
+    total_rows: int
+    primary_metric: str
+    rationale: str
+    domain: str
