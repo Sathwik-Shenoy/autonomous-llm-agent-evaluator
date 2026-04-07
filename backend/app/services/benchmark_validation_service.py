@@ -16,55 +16,97 @@ class BenchmarkValidationService:
 
     async def run(self, request: BenchmarkValidationRequest) -> BenchmarkValidationResult:
         data = self._load_dataset(request.benchmark_name)
-        rng = random.Random(request.seed)
-        rng.shuffle(data)
-        rows = data[: request.sample_size]
+        trial_task_accuracy: list[float] = []
+        trial_eval_mean: list[float] = []
+        trial_human_mean: list[float] = []
+        trial_pearson: list[float] = []
+        trial_spearman: list[float] = []
+        trial_precision: list[float] = []
+        trial_recall: list[float] = []
+        trial_f1: list[float] = []
 
-        agent = self.agent_factory.build(request.agent)
-        evaluator = EvaluationEngine(metric_weights={"correctness": 0.35, "robustness": 0.15, "hallucination": 0.2, "consistency": 0.1, "safety": 0.2})
+        for trial_idx in range(request.trials):
+            rng = random.Random(request.seed + trial_idx)
+            shuffled = list(data)
+            rng.shuffle(shuffled)
+            rows = shuffled[: request.sample_size]
 
-        task_scores: list[float] = []
-        eval_scores: list[float] = []
-        human_scores: list[float] = []
+            agent = self.agent_factory.build(request.agent)
+            evaluator = EvaluationEngine(metric_weights={"correctness": 0.35, "robustness": 0.15, "hallucination": 0.2, "consistency": 0.1, "safety": 0.2})
 
-        for row in rows:
-            prompt = str(row.get("prompt", ""))
-            reference = str(row.get("reference_answer", ""))
-            human = float(row.get("human_score", 0.5))
-            category = str(row.get("category", "general"))
+            task_scores: list[float] = []
+            eval_scores: list[float] = []
+            human_scores: list[float] = []
 
-            response = await agent.respond(
-                system_context=f"Benchmark validation for {request.benchmark_name}",
-                conversation=[{"role": "user", "content": prompt}],
-            )
-            output = response.output_text
+            for row in rows:
+                prompt = str(row.get("prompt", ""))
+                reference = str(row.get("reference_answer", ""))
+                human = float(row.get("human_score", 0.5))
+                category = str(row.get("category", "general"))
 
-            task_score = self._reference_match_score(output, reference)
-            attack_tags = [["prompt_injection"]] if category == "safety" else [[]]
-            score, _, _ = evaluator.score_turns([task_score], [output], attack_tags)
+                response = await agent.respond(
+                    system_context=f"Benchmark validation for {request.benchmark_name}",
+                    conversation=[{"role": "user", "content": prompt}],
+                )
+                output = response.output_text
 
-            task_scores.append(task_score)
-            eval_scores.append(score.weighted_total)
-            human_scores.append(human)
+                task_score = self._reference_match_score(output, reference)
+                attack_tags = [["prompt_injection"]] if category == "safety" else [[]]
+                score, _, _ = evaluator.score_turns([task_score], [output], attack_tags)
 
-        pearson = self._pearson(eval_scores, human_scores)
-        spearman = self._spearman(eval_scores, human_scores)
-        ci95 = self._ci95(eval_scores)
+                task_scores.append(task_score)
+                eval_scores.append(score.weighted_total)
+                human_scores.append(human)
+
+            pearson = self._pearson(eval_scores, human_scores)
+            spearman = self._spearman(eval_scores, human_scores)
+            precision, recall, f1 = self._precision_recall_f1(eval_scores, human_scores, request.decision_threshold)
+
+            trial_task_accuracy.append(sum(task_scores) / max(1, len(task_scores)))
+            trial_eval_mean.append(sum(eval_scores) / max(1, len(eval_scores)))
+            trial_human_mean.append(sum(human_scores) / max(1, len(human_scores)))
+            trial_pearson.append(pearson)
+            trial_spearman.append(spearman)
+            trial_precision.append(precision)
+            trial_recall.append(recall)
+            trial_f1.append(f1)
+
+        mean_task_accuracy = self._mean(trial_task_accuracy)
+        mean_eval_score = self._mean(trial_eval_mean)
+        mean_human_score = self._mean(trial_human_mean)
+        mean_pearson = self._mean(trial_pearson)
+        mean_spearman = self._mean(trial_spearman)
+        mean_precision = self._mean(trial_precision)
+        mean_recall = self._mean(trial_recall)
+        mean_f1 = self._mean(trial_f1)
 
         notes = [
             "Correlation is computed against dataset human_score labels.",
             "This provides evaluator-grounding telemetry, not a replacement for large-scale human eval.",
         ]
 
+        dataset_path = f"benchmarks/{request.benchmark_name}.jsonl"
+
         return BenchmarkValidationResult(
             benchmark_name=request.benchmark_name,
-            sample_size=len(rows),
-            task_accuracy=round(sum(task_scores) / max(1, len(task_scores)), 4),
-            evaluator_mean_score=round(sum(eval_scores) / max(1, len(eval_scores)), 4),
-            human_mean_score=round(sum(human_scores) / max(1, len(human_scores)), 4),
-            evaluator_human_pearson=round(pearson, 4),
-            evaluator_human_spearman=round(spearman, 4),
-            evaluator_human_ci95=round(ci95, 4),
+            dataset_path=dataset_path,
+            dataset_total_size=len(data),
+            sample_size=min(request.sample_size, len(data)),
+            trials=request.trials,
+            task_accuracy=round(mean_task_accuracy, 4),
+            task_accuracy_std=round(self._std(trial_task_accuracy), 4),
+            task_accuracy_ci95=round(self._ci95(trial_task_accuracy), 4),
+            precision=round(mean_precision, 4),
+            recall=round(mean_recall, 4),
+            f1=round(mean_f1, 4),
+            evaluator_mean_score=round(mean_eval_score, 4),
+            evaluator_score_std=round(self._std(trial_eval_mean), 4),
+            human_mean_score=round(mean_human_score, 4),
+            evaluator_human_pearson=round(mean_pearson, 4),
+            evaluator_human_pearson_std=round(self._std(trial_pearson), 4),
+            evaluator_human_spearman=round(mean_spearman, 4),
+            evaluator_human_spearman_std=round(self._std(trial_spearman), 4),
+            evaluator_human_ci95=round(self._ci95(trial_eval_mean), 4),
             notes=notes,
         )
 
@@ -124,3 +166,30 @@ class BenchmarkValidationService:
         var = sum((v - mean) ** 2 for v in values) / (len(values) - 1)
         std = math.sqrt(var)
         return 1.96 * std / math.sqrt(len(values))
+
+    def _std(self, values: list[float]) -> float:
+        if len(values) < 2:
+            return 0.0
+        m = self._mean(values)
+        return math.sqrt(sum((v - m) ** 2 for v in values) / (len(values) - 1))
+
+    def _mean(self, values: list[float]) -> float:
+        return sum(values) / max(1, len(values))
+
+    def _precision_recall_f1(self, eval_scores: list[float], human_scores: list[float], threshold: float) -> tuple[float, float, float]:
+        tp = fp = fn = 0
+        for pred_score, human_score in zip(eval_scores, human_scores):
+            pred_pos = pred_score >= threshold
+            true_pos = human_score >= threshold
+            if pred_pos and true_pos:
+                tp += 1
+            elif pred_pos and not true_pos:
+                fp += 1
+            elif (not pred_pos) and true_pos:
+                fn += 1
+        precision = tp / max(1, tp + fp)
+        recall = tp / max(1, tp + fn)
+        if precision + recall == 0:
+            return precision, recall, 0.0
+        f1 = 2 * precision * recall / (precision + recall)
+        return precision, recall, f1
