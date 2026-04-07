@@ -1,0 +1,151 @@
+:root {
+  --bg: #f7f3ea;
+  --bg-accent: #e6dcc9;
+  --ink: #1d262d;
+  --muted: #51626f;
+  --primary: #ce4a2b;
+  --secondary: #124559;
+  --panel: #fffdf8;
+  --line: #d7cfbf;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 15% 10%, rgba(206, 74, 43, 0.13), transparent 35%),
+    radial-gradient(circle at 85% 20%, rgba(18, 69, 89, 0.16), transparent 40%),
+    linear-gradient(135deg, var(--bg), var(--bg-accent));
+  font-family: 'Space Grotesk', sans-serif;
+  min-height: 100vh;
+}
+
+.layout {
+  width: min(1160px, 94vw);
+  margin: 0 auto;
+  padding: 2rem 0 3rem;
+}
+
+.hero {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 12px 24px rgba(22, 25, 27, 0.08);
+  animation: riseIn 420ms ease-out;
+}
+
+.kicker {
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin: 0;
+}
+
+h1 {
+  margin: 0.4rem 0;
+  font-size: clamp(1.6rem, 2.2vw, 2.4rem);
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+button {
+  border: 0;
+  background: var(--primary);
+  color: white;
+  padding: 0.7rem 1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button.secondary {
+  background: var(--secondary);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+
+.metric-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+.metric-card p {
+  margin: 0;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8rem;
+}
+
+.metric-card h2 {
+  margin: 0.4rem 0 0;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.9rem;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1rem;
+  box-shadow: 0 10px 20px rgba(15, 16, 17, 0.05);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.65rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.error {
+  color: #8e1d1d;
+}
+
+@keyframes riseIn {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 900px) {
+  .card-grid,
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
